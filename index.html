@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" crossorigin="anonymous">
+
+    <title>F3 Timer</title>
+    <style>
+        .badge { margin-left: 20px;}
+        #btnAdd { cursor: pointer;}
+    </style>
+  </head>
+  <body>
+    <div class="jumbotron text-center">
+        <h1>F3 Timer</h1>
+        <p>A stopwatch for multiple participants.</p> 
+    </div>
+
+    <div class="panel-body">
+        <div class="panel panel-info">
+            <div class="panel-heading">
+                <h3 class="panel-title">Enter Participants</h3>
+            </div>
+            <div class="panel-body">
+                <div class="input-group">
+                    <input type="text" id="txtName" class="form-control" placeholder="Participant's name" aria-describedby="basic-addon2">
+                    <span class="input-group-addon" id="btnAdd">Add</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel panel-warning">
+            <div class="panel-heading">
+                <h3 class="panel-title">Event</h3>
+            </div>
+            <div class="panel-body">
+                <div class="input-group">
+                    <p><button type="button" class="btn btn-success" id="btnStart">Start Event</button></p>
+                </div>
+                <div class="panel panel-default">
+                    <div class="panel-heading">Currently competing participants</div>
+                    <div class="panel-body" id="currentParticipantsPanel">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel panel-danger">
+            <div class="panel-heading">
+                <h3 class="panel-title">Results</h3>
+            </div>
+            <div class="panel-body">
+                <div class="input-group">
+                    <ul class="list-group" id="results" >
+                        
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <button type="button" class="btn btn-danger" id="btnReset">Reset Entire Event</button>
+    </div>
+
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+    <script>
+        var state;
+
+        $(document).ready(function(){
+            load();
+            $('#btnAdd').click(btnAdd_Click);
+            $('#btnStart').click(btnStart_Click);
+            window.setInterval(timer_Tick, 1000);
+            $('#btnReset').click(btnReset_Click);
+            updateDisplay(true);
+        });
+
+        function getInitState() {
+            return {
+                'participants': [],
+                'stopwatchStart': undefined
+            };
+        }
+
+        function btnReset_Click() {
+            state = getInitState();
+            updateDisplay(true);
+        }
+
+        function timer_Tick(){
+            updateDisplay(false);
+        }
+
+        function save(){
+            localStorage.setItem('F3Timer_state', JSON.stringify(state));
+        }
+
+        function load(){
+            var item = localStorage.getItem('F3Timer_state');
+            if(item === null || item === undefined){
+                state = getInitState();
+            }else{
+                state = JSON.parse(item);
+            }
+            updateDisplay(true);
+        }
+
+        function updateDisplay(reflow) {
+            if(reflow) {
+                save();
+                if (state.stopwatchStart == undefined) {
+                    $('#btnStart').show();
+                } else {
+                    $('#btnStart').hide();
+                }
+
+                $('#currentParticipantsPanel').empty();
+                
+                state.participants.filter(p => p.elapsed === undefined).forEach(p => {
+                    $('#currentParticipantsPanel').append(
+                        $('<p/>').append(
+                            $('<button type="button" class="btn btn-primary"/>')
+                                .attr('id', p.id)
+                                .text(p.name)
+                                .click(btnParticipant_Click)
+                                .append($('<span class="badge"/>'))
+                        )
+                    );
+                });
+
+                $('#results').empty();
+                state.participants.filter(p => p.elapsed !== undefined).forEach(p => {
+                    $('#results').append(
+                        $('<li class="list-group-item"/>')
+                            .text(p.name)
+                            .append($('<span class="badge"/>')
+                                .text(prettyPrintTime(p.elapsed))
+                            )
+                    );
+                });
+            }
+
+            if(state.stopwatchStart !== undefined) {
+                $('#currentParticipantsPanel .badge').text(prettyPrintTime(Date.now() - state.stopwatchStart));
+            } else {
+                $('#currentParticipantsPanel .badge').text(prettyPrintTime(0));
+            }
+        }
+
+        function prettyPrintTime(ticks) {
+            return displayTime(Math.floor(ticks/1000));
+        }
+
+        function btnParticipant_Click() {
+            if(state.stopwatchStart === undefined) return;
+            var id = $(this).attr('id');
+            var participant = state.participants.find(p => p.id === id);
+            participant.elapsed = Date.now() - state.stopwatchStart;
+            updateDisplay(true);
+        }
+
+        function displayTime(ticksInSecs) {
+            var ticks = ticksInSecs;
+            var hh = Math.floor(ticks / 3600);
+            var mm = Math.floor((ticks % 3600) / 60);
+            var ss = ticks % 60;
+
+            if(hh > 0){
+                return pad(hh, 2) + ":" + pad(mm, 2) + ":" + pad(ss, 2);
+            }else{
+                return pad(mm, 2) + ":" + pad(ss, 2);
+            }
+        }
+
+        function pad(n, width) {
+            var n = n + '';
+            return n.length >= width ? n : new Array(width - n.length + 1).join('0') + n;
+        }
+
+        function btnStart_Click() {
+            state.stopwatchStart = Date.now();
+            updateDisplay(true);
+        }
+
+        function btnAdd_Click(){
+            var name = $('#txtName').val();
+            if(name !== ''){
+                state.participants.push(({ 'name': name, 'elapsed': undefined, 'id': ('p' + Date.now()) }));
+                $('#txtName').val('');
+            }
+            updateDisplay(true);
+        }
+    </script>
+  </body>
+</html>
